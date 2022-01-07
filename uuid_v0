@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Copyright (C) 2022 by J.W https://github.com/jakwings/uuid.sh
+#
+#   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+#
+#  0. You just DO WHAT THE FUCK YOU WANT TO.
+
+set -euf; unset -v IFS; export LC_ALL=C
+
+IFS=" '	"'!"#$%&()*+,-./:;<=>?@GHIJKLMNOPQRSTUVWXYZ[\]^_`ghijklmnopqrstuvwxyz{|}~'
+s='' i=0
+while [ 16 -gt "${i}" ]; do
+	IFS='' read -r z
+	for z in $z; do
+		s="${s}${z%%[!0-9A-Fa-f]*}"
+	done
+	while [ 2 -le "${#s}" ] && [ 16 -ge "$(( i += 1 ))" ]; do
+		z="${s#??}"
+		printf '%02x' "$(( 0x${s%"${z}"} ))"
+		case "${i}" in (4|6|8|10) printf -; esac
+		s="${z}"
+	done
+done </dev/urandom
+printf '\n'

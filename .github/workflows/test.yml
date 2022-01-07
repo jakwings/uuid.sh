@@ -1,0 +1,67 @@
+# https://github.com/actions/checkout
+# https://docs.github.com/actions/using-workflows
+
+name: './test.sh # sh bash dash mksh oksh zsh'
+
+on: [push, pull_request]
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Shells
+      run: sudo apt-get install openssl shellcheck dash mksh zsh
+    - name: Shellcheck
+      run: |
+        for sh in sh dash bash; do
+          shellcheck -o all -s "${sh}" uuid test.sh
+        done
+    - name: Seed PRNG
+      run: printf 'SEED=%s\n' "$(date '+%s')" >>"${GITHUB_ENV}"
+    - name: ./test.sh
+      run: DO_SH= ./test.sh
+    - name: sh test.sh
+      run: DO_SH=sh sh test.sh
+    - name: bash test.sh
+      run: DO_SH=bash bash test.sh
+    - name: dash test.sh
+      run: DO_SH=dash dash test.sh
+    - name: mksh test.sh
+      run: DO_SH=mksh mksh test.sh
+    #- name: oksh test.sh
+    #  run: DO_SH=oksh oksh test.sh
+    - name: zsh test.sh
+      run: |
+        ln -s -f "$(command -v zsh)" ./sh
+        DO_SH="${PWD}/sh" ./sh test.sh
+
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Shells
+      run: brew install shellcheck mksh oksh
+    - name: Shellcheck
+      run: |
+        for sh in sh dash bash; do
+          shellcheck -o all -s "${sh}" uuid test.sh
+        done
+    - name: Seed PRNG
+      run: printf 'SEED=%s\n' "$(date '+%s')" >>"${GITHUB_ENV}"
+    - name: ./test.sh
+      run: DO_SH= ./test.sh
+    - name: sh test.sh
+      run: DO_SH=sh sh test.sh
+    - name: bash test.sh
+      run: DO_SH=bash bash test.sh
+    - name: dash test.sh
+      run: DO_SH=dash dash test.sh
+    - name: mksh test.sh
+      run: DO_SH=mksh mksh test.sh
+    - name: oksh test.sh
+      run: DO_SH=oksh oksh test.sh
+    - name: zsh test.sh
+      run: |
+        ln -s -f "$(command -v zsh)" ./sh
+        DO_SH="${PWD}/sh" ./sh test.sh
