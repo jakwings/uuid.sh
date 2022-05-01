@@ -372,12 +372,6 @@ checkpoint --binary --guid v8; uuid_bgs_test v8
 ########################################################################
 ############### -d, --decode
 
-unset -v uuid_version uuid_variant \
-         uuid_period uuid_sequence uuid_node \
-         uuid_domain uuid_identifier \
-         uuid_second uuid_subsecond \
-         uuid_year uuid_month uuid_day uuid_hour uuid_minute
-
 uuid_d_test() (
   set -e
   i=0
@@ -401,6 +395,11 @@ uuid_0ds_test() (
   set -e
   ver="${1%-*}" var="${1#*-}"; shift
   ! case "${ver}" in ([12345678]) false; esac || return 1
+  unset -v uuid_version uuid_variant \
+           uuid_period uuid_sequence uuid_node \
+           uuid_domain uuid_identifier \
+           uuid_second uuid_subsecond \
+           uuid_year uuid_month uuid_day uuid_hour uuid_minute
   result="$(uuid_ss v"${ver}" ${1+"$@"})"
   eval "$(uuid -d v0 "${result}")"
   [ "${ver}" = "${uuid_version}" ]
