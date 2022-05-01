@@ -267,6 +267,7 @@ check_uuid() (
   s="$1" i=0 err='' poo='' ver='' var=''
   while [ 0 -lt "${#s}" ]; do
     case "$(( i += 1 ))" in
+      (37) break ;;
       (9|14|19|24) case_in "${s}" '-*'    || err=1 poo="${poo} ${i}" ;;
       (15) case_in "${s}" '[12345678]*'   || err=1 ver="${i}" ;;
       (20) case_in "${s}" '[89ABCDabcd]*' || err=1 var="${i}" ;;
@@ -274,19 +275,23 @@ check_uuid() (
     esac
     s="${s#?}"
   done
+  if [ 36 != "${i}" ]; then
+    err=1
+  fi
   if [ '' != "${poo}" ]; then
-    ekho 'UUID contains invalid characters'; ekho "$1"; ekho "$(
+    poo="$(
       set -e
       k=0; for i in $poo; do printf "%$(( i - k ))s" '^'; k="${i}"; done
     )"
+    ekho 'UUID contains invalid characters'; ekho "$1"; ekho "${poo}"
   fi
   if [ '' != "${ver}" ]; then
-    ekho 'UUID contains invalid version bits'
-    ekho "$1"; ekho "$(printf "%${ver}s" '^')"
+    poo="$(printf "%${ver}s" '^')"
+    ekho 'UUID contains invalid version bits'; ekho "$1"; ekho "${poo}"
   fi
   if [ '' != "${var}" ]; then
-    ekho 'UUID contains invalid variant bits'
-    ekho "$1"; ekho "$(printf "%${var}s" '^')"
+    poo="$(printf "%${var}s" '^')"
+    ekho 'UUID contains invalid variant bits'; ekho "$1"; ekho "${poo}"
   fi
   if [ '' != "${err}" ]; then
     ekho 'UUID must be hexadecimal digits (0-9 A-F a-f) in the form:'
