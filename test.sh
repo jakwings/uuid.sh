@@ -293,8 +293,7 @@ checkpoint --binary v6; uuid_bs_test v6 7 6
 checkpoint --binary v6; uuid_bs_test v6 7
 checkpoint --binary v6; (set -e; export PATH="${TESTPATH}"; uuid_bs_test v6)
 
-checkpoint --binary v7; uuid_bs_test v7 7 6 5 444444444444
-checkpoint --binary v7; uuid_bs_test v7 7 6 5
+checkpoint --binary v7; uuid_bs_test v7 7 6 555555555555
 checkpoint --binary v7; uuid_bs_test v7 7 6
 checkpoint --binary v7; uuid_bs_test v7 7
 checkpoint --binary v7; (set -e; export PATH="${TESTPATH}"; uuid_bs_test v7)
@@ -397,7 +396,7 @@ uuid_0ds_test() (
   unset -v uuid_version uuid_variant \
            uuid_period uuid_sequence uuid_node \
            uuid_domain uuid_identifier \
-           uuid_second uuid_subsecond \
+           uuid_millisecond uuid_random1 uuid_random2 \
            uuid_year uuid_month uuid_day uuid_hour uuid_minute
   result="$(uuid_ss v"${ver}" ${1+"$@"})"
   eval "$(uuid -d v0 "${result}")"
@@ -422,11 +421,10 @@ uuid_0ds_test() (
       [ x"$5" = x"${uuid_node}" ]
       ;;
     (7)
-      [ 4 = "$#" ]
-      [ x"$1" = x"${uuid_second}" ]
-      [ x"$2" = x"${uuid_subsecond}" ]
-      [ x"$3" = x"${uuid_sequence}" ]
-      [ x"$4" = x"${uuid_node}" ]
+      [ 3 = "$#" ]
+      [ x"$1" = x"${uuid_millisecond}" ]
+      [ x"$2" = x"${uuid_random1}" ]
+      [ x"$3" = x"${uuid_random2}" ]
       ;;
     (8)
       [ 6 = "$#" ]

@@ -15,12 +15,15 @@ exec 3>&1 1>&2
 # - https://tools.ietf.org/html/rfc4122
 # - https://www.rfc-editor.org/rfc/inline-errata/rfc4122.html
 # - https://pubs.opengroup.org/onlinepubs/9696989899/chap5.htm#tagcjh_08_02_01_01
-# - https://tools.ietf.org/html/draft-peabody-dispatch-new-uuid-format-02
+# - https://tools.ietf.org/html/draft-peabody-dispatch-new-uuid-format-03
 # Some proposed namespace UUIDs:
 # - 6ba7b810-9dad-11d1-80b4-00c04fd430c8 Fully-Qualified Domain Name (FQDN, DNS)
 # - 6ba7b811-9dad-11d1-80b4-00c04fd430c8 Uniform Resource Locator (URL)
 # - 6ba7b812-9dad-11d1-80b4-00c04fd430c8 ISO Object Identifier (ISO OID)
 # - 6ba7b814-9dad-11d1-80b4-00c04fd430c8 X.500 Distinguished Name (X.500 DN)
+# These two special IDs make no sense for this program:
+# - 00000000-0000-0000-0000-000000000000
+# - ffffffff-ffff-ffff-ffff-ffffffffffff
 help() {
   printf '%s' 'uuid.sh -- a UUID Generator in POSIX Shell
 
@@ -39,7 +42,7 @@ Options:
     -g, --guid
         Output variant-2 UUIDs by costing 1 bit of randomness.
     -n, --next
-        Output the next UUID for version 1, 2, 6, or 7.
+        Output the next UUID for version 1, 2 or 6.
     -s, --seed <number>
         Use a deterministic pseudo-random number generator.
     -l, --lowercase
@@ -61,11 +64,11 @@ Summary of available versions:
     uuid v5 <uuid> <text>...
         ... 16 bytes of 6 fixed bits from a 20-byte SHA-1 hash ...
     uuid v6 [<period> [<sequence> [<node>]]]
-        ... Draft#2: lexicographically sortable by Gregorian timestamp ...
-    uuid v7 [<second> [<subsecond> [<sequence> [<node>]]]]
-        ... Draft#2: lexicographically sortable by Unix Epoch timestamp ...
+        ... Draft#3: lexicographically sortable by Gregorian timestamp ...
+    uuid v7 [<millisecond> [<random1> [<random2>]]]
+        ... Draft#3: lexicographically sortable by Unix Epoch timestamp ...
     uuid v8 [<year> [<month> [<day> [<hour> [<minute> [<node>]]]]]]
-        ... Draft#2: lexicographically sortable by custom timestamp ...
+        ... Draft#3: lexicographically sortable by custom timestamp ...
 
 Notes:
     For time-based UUIDs, users must provide a system-wide global lock
@@ -410,17 +413,13 @@ uuid_v_() {
   else
     if [ 3 -le "$#" ]; then  # state available
       period="$(check_uint period 0 "${max_period}" "$1")"
-      case "${v}" in
-        (6) : $(( sequence = (sequence + (period <= now)) % max_sequence )) ;;
-        (*)
-          # NOTE: presume we are the only generator in service
-          if [ "${period}" -eq "${now}" ]; then
-            die 'running out of UUID for now'
-          fi
-          if [ "${period}" -gt "${now}" ]; then  # system clock went backward
-            : $(( sequence = (sequence + 1) % max_sequence ))
-          fi
-      esac
+      # NOTE: presume we are the only generator in service
+      if [ "${period}" -eq "${now}" ]; then
+        die 'running out of UUID for now'
+      fi
+      if [ "${period}" -gt "${now}" ]; then  # system clock went backward
+        : $(( sequence = (sequence + 1) % max_sequence ))
+      fi
     fi
   fi
 
@@ -529,115 +528,73 @@ uuid_v6() (
 #  0                   10                  20                  30
 #   0 1 2 3 4 5 6 7 8 9 A B C D E F 0 1 2 3 4 5 6 7 8 9 A B C D E F
 #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |                            unixts                             |
+#  |                          millisecond                          |
 #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |unixts |       subsec_a        |  ver  |       subsec_b        |
+#  |          millisecond          |  ver  |        random1        |
 #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |var$                    subsec_seq_node                        |
+#  |var$                        random2                            |
 #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |                        subsec_seq_node                        |
+#  |                            random2                            |
 #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 uuid_v7() (
   set -e
   [ 1 != "${cfg_32bit}" ] || die 'unable to manipulate 64-bit numbers'
-  need_args uuid_v7 "$#" 0 4
+  need_args uuid_v7 "$#" 0 3
 
-  unset -v max_second max_subsecond max_sequence max_node \
-           now_s now_ss second subsecond sequence node x
+  unset -v max_millisecond max_random1 max_random2 \
+           now_s now_ns millisecond random1 random2 x
   pcg_clear
 
-#  0                   10                  20                  30
-#   0 1 2 3 4 5 6 7 8 9 A B C D E F 0 1 2 3 4 5 6 7 8 9 A B C D E F
-#  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |                            second                             |
-#  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |second |      microsecond      |  ver  |      microsecond      |
-#  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |var$         sequence          |          node (0-1)           |
-#  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#  |                          node (2-5)                           |
-#  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
   y0="${flg_guid-0}"
-  max_second=68719476735              # 36 bits 0x0FFFFFFFFF
-  max_subsecond=16777215              # 24 bits 0x00FFFFFF
-  max_sequence="$(( 0x3FFF >> y0 ))"  # 14 bits 0x3FFF
-  max_node=281474976710655            # 48 bits 0xFFFFFFFFFFFF
+  max_millisecond=281474976710655                # 48 bits 0xFFFFFFFFFFFF
+  max_random1=4095                               # 12 bits 0x0FFF
+  max_random2="$(( 0x3FFFFFFFFFFFFFFF >> y0 ))"  # 62 bits 0x3FFFFFFFFFFFFFFF
 
   if [ 1 = "${cfg_seed+1}" ]; then
     pcg_srand "${cfg_seed}"
   else
-    gettime now_s now_ss
-    pcg_srand "$(( now_s ^ now_ss ))"
+    gettime now_s now_ns
+    pcg_srand "$(( now_s ^ now_ns ))"
   fi
 
-  if [ 1 -ge "$#" ] || [ 1 = "${flg_next-}" ]; then
-    if [ 1 != "${now_ss+1}" ]; then
-      gettime now_s now_ss
+  if [ 0 -ge "$#" ]; then
+    if [ 1 != "${now_s+1}" ]; then
+      gettime now_s now_ns
     fi
-    : $(( now_s = now_s & 0x0FFFFFFFFF ))
-    : $(( now_ss = (now_ss / 1000) & 0x00FFFFFF ))
-  fi
-
-  pcg_rand "${max_node} + 1"
-  if [ 4 -gt "$#" ]; then
-    node="${pcg_number}"
+    # FIXME: overflow check
+    millisecond="$(( now_s * 1000 + now_ns / 1000000 ))"
   else
-    node="$(check_node 6 "${max_node}" "$4")"
+    millisecond="$(check_uint millisecond 0 "${max_millisecond}" "$1")"
   fi
 
+  pcg_rand "${max_random1} + 1"
+  if [ 2 -gt "$#" ]; then
+    random1="${pcg_number}"
+  else
+    random1="$(check_uint random1 0 "${max_random1}" "$2")"
+  fi
+
+  pcg_rand "${max_random2} + 1"
   if [ 3 -gt "$#" ]; then
-    sequence=0
+    random2="${pcg_number}"
   else
-    sequence="$(check_uint sequence 0 "${max_sequence}" "$3")"
+    random2="$(check_uint random2 0 "${max_random2}" "$3")"
   fi
 
-  pcg_rand "${max_subsecond} + 1"
-  if [ 1 -gt "$#" ]; then
-    subsecond="${now_ss}"
-  elif [ 2 -gt "$#" ]; then
-    subsecond="${pcg_number}"
-  else
-    subsecond="$(check_uint subsecond:microsecond 0 "${max_subsecond}" "$2")"
-  fi
-  if [ 1 -gt "$#" ]; then
-    second="${now_s}"
-  else
-    second="$(check_uint second 0 "${max_second}" "$1")"
-  fi
-
-  if [ 1 = "${flg_next-}" ]; then
-    if [ 4 -le "$#" ]; then  # state available
-      if [ "${second}.${subsecond}" = "${now_s}.${now_ss}" ]; then
-        # NOTE: presume we are the only generator in service
-        [ "${sequence}" -lt "${max_sequence}" ] \
-          || die 'running out of UUID for now'
-        : $(( sequence += 1 ))
-      elif [ "${second}" -gt "${now_s}" ]; then
-        sequence=0
-      elif [ "${second}" -eq "${now_s}" ] && [ "${subsecond}" -gt "${now_ss}" ]
-      then
-        sequence=0
-      fi
-    fi
-    second="${now_s}"
-    subsecond="${now_ss}"
-  fi
-
-  if [ upper != "${flg_case-}" ]; then x=x; else x=X; fi
+  if [ upper != "${cfg_case-}" ]; then x=x; else x=X; fi
 
   if [ 1 = "${flg_decode-}" ]; then
-    printf "%u %u %u %012${x}\\n" \
-           "${second}" "${subsecond}" "${sequence}" "${node}" >&3
+    printf '%u %u %u\n' "${millisecond}" "${random1}" "${random2}" >&3
     return
   fi
 
   : $(( y1 = !(${flg_guid-0}) ? 0x8000 : 0xC000 ))
   : $(( y2 = !(${flg_guid-0}) ? 0x3FFF : 0x1FFF ))
-  : $(( s1_08 = (second >> 4) & 0xFFFFFFFF ))
-  : $(( s2_04 = ((second & 0xF) << 12) | ((subsecond >> 12) & 0x0FFF) ))
-  : $(( s3_04 = 0x7000 | (subsecond & 0x0FFF) ))
-  : $(( s4_04 = (y1 | (sequence & y2)) ))
-  : $(( s5_12 = node & 0xFFFFFFFFFFFF ))
+  : $(( s1_08 = (millisecond >> 16) & 0xFFFFFFFF ))
+  : $(( s2_04 = millisecond & 0xFFFF ))
+  : $(( s3_04 = 0x7000 | (random1 & 0x0FFF) ))
+  : $(( s4_04 = (y1 | ((random2 >> 48) & y2)) ))
+  : $(( s5_12 = random2 & 0xFFFFFFFFFFFF ))
 
   uuid="$(
     set -e
@@ -862,18 +819,17 @@ uuid_v0() (
       [ 1 != "${cfg_32bit}" ] || die 'unable to manipulate 64-bit numbers'
       s="$(
         set -e
-        printf '%u %u %u '"%06${x}%06${x}\\n" \
-               "$(( (0x$1 << 4) | (0x$2 >> 12) ))" \
-               "$(( (0x${2#?} << 12) | 0x${3#?} ))" \
-               "$(( 0x$4 & (0x3FFF >> y0) ))" \
-               "$(( 0x${5%??????} ))" "$(( 0x${5#??????} ))"
+        printf '%u %u %u' \
+               "$(( (0x$1 << 16) | 0x$2 ))" \
+               "$(( 0x${3#?} ))" \
+               "$(( ((0x$4 & (0x3FFF >> y0)) << 48) | 0x$5 ))"
       )"
       if [ 1 != "${flg_decode-}" ]; then
         "uuid_v${version}" $s
       else
         set -- "${version}" "${variant}" $s
         s="$(printf 'uuid_%s=%%s\n' version variant \
-                                    second subsecond sequence node)"
+                                    millisecond random1 random2)"
         printf "${s}\\n" "$@" >&3
       fi
       ;;
