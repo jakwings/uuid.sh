@@ -15,7 +15,7 @@ exec 3>&1 1>&2
 # - https://tools.ietf.org/html/rfc4122
 # - https://www.rfc-editor.org/rfc/inline-errata/rfc4122.html
 # - https://pubs.opengroup.org/onlinepubs/9696989899/chap5.htm#tagcjh_08_02_01_01
-# - https://tools.ietf.org/html/draft-peabody-dispatch-new-uuid-format-03
+# - https://tools.ietf.org/html/draft-peabody-dispatch-new-uuid-format-04
 # Some proposed namespace UUIDs:
 # - 6ba7b810-9dad-11d1-80b4-00c04fd430c8 Fully-Qualified Domain Name (FQDN, DNS)
 # - 6ba7b811-9dad-11d1-80b4-00c04fd430c8 Uniform Resource Locator (URL)
@@ -71,7 +71,7 @@ Summary of available versions:
         ... Draft#3: lexicographically sortable by custom timestamp ...
 
 Notes:
-    For time-based UUIDs, users must provide a system-wide global lock
+    For time-based UUIDs, users must provide a system-wide global guard
     to avoid race conditions among generators runing at the same time.
     Please reference section 4.2 of RFC4122 for useful tips.
     https://www.rfc-editor.org/rfc/inline-errata/rfc4122.html
